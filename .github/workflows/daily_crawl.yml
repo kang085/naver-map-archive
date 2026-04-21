@@ -29,7 +29,7 @@ jobs:
         pip install pandas selenium webdriver-manager
 
     - name: 🚀 크롤러 실행 (최대 2개 검색어)
-      run: python naver_crawler_every_v3.py
+      run: python naver_crawler_every_v5.py
 
     - name: 💾 모든 결과물 안전하게 저장 (Commit & Push)
       run: |

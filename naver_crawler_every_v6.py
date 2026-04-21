@@ -146,6 +146,8 @@ def git_commit_and_push(search_query, current_page):
         if status.returncode != 0:
             commit_msg = f"Auto-update: '{search_query}' {current_page}페이지 완료 안전 저장"
             subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+            # 💡 [핵심 추가] Push 하기 전에 GitHub 서버의 최신 상태를 먼저 당겨와서(Pull) 병합합니다.
+            subprocess.run(["git", "pull", "--rebase"], check=False)
             subprocess.run(["git", "push"], check=True)
             logging.info(f"☁️ GitHub 자동 푸시 완료: {current_page}페이지 데이터 박제 성공!")
         else:
@@ -517,11 +519,22 @@ def main():
         progress = load_progress()
         completed = set(progress.get("completed_searches", []))
         driver = initialize_driver()
+
+        # 💡 [추가] 오늘 처리한 검색어 개수를 세는 변수
+        procesed_count = 0
         
         for search_query in search_terms:
             if search_query in completed: 
                 logging.info(f"⭐️ '{search_query}' 이미 완료됨, 건너뜀")
                 continue
+
+            # 💡 [추가] 2개를 이미 처리했다면 다음 검색어로 넘어가지 않고 완전히 종료!
+            if processed_count >= 2:
+                logging.info("🛑 목표한 검색어 2개 처리를 모두 완료했습니다. 다음 스케줄에 이어서 진행합니다.")
+                break
+            
+            # 새로운 검색어 처리를 시작하므로 카운트 1 증가
+            processed_count += 1
             
             start_page = progress.get("current_page", 1) if progress.get("current_search") == search_query else 1
             retry_count = 0

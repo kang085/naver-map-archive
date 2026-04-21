@@ -32,6 +32,7 @@ jobs:
       run: python naver_crawler_every_v5.py
 
     - name: 💾 모든 결과물 안전하게 저장 (Commit & Push)
+      if: always()  # 💡 [추가됨] 파이썬이 중간에 터져도 이 단계는 무조건 실행하여 잔여 데이터를 구조합니다!
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
@@ -40,8 +41,8 @@ jobs:
         git add .
         
         if ! git diff --cached --quiet; then
-          git commit -m "Auto-update: 검색어 2개 크롤링 완료 및 결과물 저장"
+          git commit -m "Auto-update: 크롤링 완료 또는 강제 종료 전 잔여 데이터 저장"
           git push
         else
-          echo "저장할 변경사항이 없습니다. (모든 크롤링이 완료되었을 수 있습니다.)"
+          echo "저장할 변경사항이 없습니다. (파이썬 내부에서 이미 모두 저장되었을 수 있습니다.)"
         fi

@@ -2,9 +2,9 @@ name: Naver Map Daily Archive
 
 on:
   schedule:
-    # 🕒 1. 한국 시간 오후 5시 (17:00 KST) 실행
+    # 1. 한국 시간 오후 5시 (17:00 KST) 실행
     - cron: '0 8 * * *'
-    # 🕒 2. 한국 시간 오전 5시 (05:00 KST) 실행
+    # 2. 한국 시간 오전 5시 (05:00 KST) 실행
     - cron: '0 20 * * *'
   workflow_dispatch:
 

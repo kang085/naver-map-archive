@@ -1,0 +1,41 @@
+name: Naver Map Daily Archive
+
+on:
+  schedule:
+    # 한국 시간 기준 매일 새벽 3시 실행 (UTC 18:00)
+    - cron: '0 18 * * *'
+  workflow_dispatch: # 직접 실행 버튼 활성화
+
+permissions:
+  contents: write # 서버가 결과물을 저장소에 기록할 수 있는 권한
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 코드 체크아웃
+      uses: actions/checkout@v4
+
+    - name: 🐍 파이썬 환경 설정
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: 📦 라이브러리 설치
+      run: |
+        pip install -r requirements.txt
+
+    - name: 🚀 크롤러 실행
+      run: python naver_crawler_every_v3.py
+
+    - name: 💾 결과물 저장 (Commit & Push)
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add *.csv progress_poi.json
+        # 변경사항이 있을 때만 저장함
+        if ! git diff --cached --quiet; then
+          git commit -m "Auto-update: 새벽 크롤링 데이터 업데이트"
+          git push
+        fi

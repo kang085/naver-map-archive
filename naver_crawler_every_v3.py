@@ -443,7 +443,7 @@ def crawl_search_query(driver, search_query, start_page=1):
             if data:
                 safe_execute(save_data, data, f"{search_query}.csv")
             
-            save_progress(search_query, current_page)
+            save_progress(search_query, current_page + 1)
             current_page += 1
             
             try:

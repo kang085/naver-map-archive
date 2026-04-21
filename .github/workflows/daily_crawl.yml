@@ -2,19 +2,21 @@ name: Naver Map Daily Archive
 
 on:
   schedule:
-    # 한국 시간 기준 매일 새벽 3시 실행 (UTC 18:00)
-    - cron: '0 18 * * *'
-  workflow_dispatch: # 직접 실행 버튼 활성화
+    # 🕒 1. 한국 시간 오후 5시 (17:00 KST) 실행
+    - cron: '0 8 * * *'
+    # 🕒 2. 한국 시간 오전 5시 (05:00 KST) 실행
+    - cron: '0 20 * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write # 서버가 결과물을 저장소에 기록할 수 있는 권한
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 📥 코드 체크아웃
+    - name: 📥 코드 가져오기
       uses: actions/checkout@v4
 
     - name: 🐍 파이썬 환경 설정
@@ -24,18 +26,22 @@ jobs:
 
     - name: 📦 라이브러리 설치
       run: |
-        pip install -r requirements.txt
+        pip install pandas selenium webdriver-manager
 
-    - name: 🚀 크롤러 실행
+    - name: 🚀 크롤러 실행 (최대 2개 검색어)
       run: python naver_crawler_every_v3.py
 
-    - name: 💾 결과물 저장 (Commit & Push)
+    - name: 💾 모든 결과물 안전하게 저장 (Commit & Push)
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add *.csv progress_poi.json
-        # 변경사항이 있을 때만 저장함
+        
+        # 변경된 검색어.csv, progress_poi.json, 산출물 csv 모두 추적
+        git add .
+        
         if ! git diff --cached --quiet; then
-          git commit -m "Auto-update: 새벽 크롤링 데이터 업데이트"
+          git commit -m "Auto-update: 검색어 2개 크롤링 완료 및 결과물 저장"
           git push
+        else
+          echo "저장할 변경사항이 없습니다. (모든 크롤링이 완료되었을 수 있습니다.)"
         fi

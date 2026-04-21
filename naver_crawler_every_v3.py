@@ -36,7 +36,7 @@ import threading
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 PROGRESS_FILE = "progress_poi.json"
 SEARCH_FILE = "검색어.csv" 
-HEADLESS_MODE = False  # 진행 상황을 보려면 False, 숨기려면 True
+HEADLESS_MODE = True  # 진행 상황을 보려면 False, 숨기려면 True
 MAX_PAGE = 5
 WATCHDOG_TIMEOUT = 60
 MAX_RETRY_ATTEMPTS = 3

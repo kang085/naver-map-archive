@@ -11,6 +11,7 @@
 
 import os
 import sys
+import subprocess
 import urllib.parse
 import pandas as pd
 from selenium import webdriver
@@ -36,7 +37,7 @@ import threading
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 PROGRESS_FILE = "progress_poi.json"
 SEARCH_FILE = "검색어.csv" 
-HEADLESS_MODE = True  # 진행 상황을 보려면 False, 숨기려면 True
+HEADLESS_MODE = False  # 진행 상황을 보려면 False, 숨기려면 True
 MAX_PAGE = 5
 WATCHDOG_TIMEOUT = 60
 MAX_RETRY_ATTEMPTS = 3
@@ -127,6 +128,31 @@ def save_data(data, file_name):
     else:
         df.to_csv(file_name, mode='a', header=False, index=False, encoding="utf-8-sig")
         logging.info(f"📁 파일 {file_name}에 데이터 추가 완료 ({len(data)}건)")
+
+# ===========================
+# ☁️ GitHub 자동 Push 함수 (추가)
+# ===========================
+def git_commit_and_push(search_query, current_page):
+    try:
+        # Git 사용자 설정
+        subprocess.run(["git", "config", "--local", "user.email", "github-actions[bot]@users.noreply.github.com"], check=False)
+        subprocess.run(["git", "config", "--local", "user.name", "github-actions[bot]"], check=False)
+        
+        # 파일 추적 (새로 생성된 csv 및 json 모두 포함)
+        subprocess.run(["git", "add", "*.csv", PROGRESS_FILE], check=True)
+        
+        # 변경사항이 있는지 확인 후 푸시
+        status = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
+        if status.returncode != 0:
+            commit_msg = f"Auto-update: '{search_query}' {current_page}페이지 완료 안전 저장"
+            subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+            subprocess.run(["git", "push"], check=True)
+            logging.info(f"☁️ GitHub 자동 푸시 완료: {current_page}페이지 데이터 박제 성공!")
+        else:
+            logging.info(f"☁️ GitHub 저장: 변경된 데이터가 없습니다.")
+    except Exception as e:
+        logging.error(f"❌ GitHub 푸시 에러 (크롤링은 계속 진행): {e}")
+
 
 def check_out_of_memory(driver):
     try:
@@ -443,20 +469,32 @@ def crawl_search_query(driver, search_query, start_page=1):
             if data:
                 safe_execute(save_data, data, f"{search_query}.csv")
             
-            save_progress(search_query, current_page + 1)
-            current_page += 1
-            
+            # --- 💡 수정된 핵심 로직: 페이지 완료 후 상태 저장, 깃허브 푸시, 재시작 신호 반환 ---
+            if current_page >= MAX_PAGE:
+                mark_search_completed(search_query) # JSON을 완료 상태로 덮어쓰기
+                git_commit_and_push(search_query, current_page) # 깃허브에 영구 저장
+                logging.info(f"✅ 검색어 '{search_query}' (최대 {MAX_PAGE}페이지) 크롤링 완료")
+                return True
+                
             try:
                 next_button = driver.find_element(By.CSS_SELECTOR, '#app-root > div > div.XUrfU > div.zRM9F > a:nth-child(7)')
-                if 'disabled' in next_button.get_attribute('class'): break
-                next_button.click()
-                time.sleep(random.uniform(6, 8))
+                if 'disabled' in next_button.get_attribute('class'):
+                    mark_search_completed(search_query)
+                    git_commit_and_push(search_query, current_page)
+                    logging.info(f"✅ 검색어 '{search_query}' (마지막 페이지) 크롤링 완료")
+                    return True
+                else:
+                    save_progress(search_query, current_page + 1) # 다음 시작할 페이지 번호(+1) 저장
+                    git_commit_and_push(search_query, current_page) # 지금까지의 결과 깃허브에 박제!
+                    logging.info(f"🧹 메모리 최적화: {current_page}페이지 완료. 브라우저를 선제적으로 재시작합니다.")
+                    return "RESTART_REQUIRED" # 계속 돌지 말고 멈추라는 신호 전송
             except Exception:
-                break
-            
-        mark_search_completed(search_query)
-        logging.info(f"✅ 검색어 '{search_query}' 크롤링 완료")
-        return True
+                mark_search_completed(search_query)
+                git_commit_and_push(search_query, current_page)
+                logging.info(f"✅ 검색어 '{search_query}' 크롤링 완료 (다음 버튼 없음)")
+                return True
+            # --------------------------------------------------------
+
     finally:
         watchdog.stop()
 
@@ -490,16 +528,27 @@ def main():
             
             while retry_count < MAX_RETRY_ATTEMPTS:
                 try:
-                    # 💡 [핵심 수정] 작업 시작 전에 즉시 진행 상황을 저장합니다!
                     save_progress(search_query, start_page)
-                    if crawl_search_query(driver, search_query, start_page): break
+                    result = crawl_search_query(driver, search_query, start_page)
+                    
+                    if result is True:
+                        break # 모든 크롤링이 정상적으로 진짜 완료되었을 때만 탈출
+                    elif result == "RESTART_REQUIRED":
+                        # 💡 1페이지 정상 완료 후 크롬을 끄고 다음 페이지를 위해 다시 켜는 로직
+                        try: driver.quit()
+                        except Exception: pass
+                        time.sleep(8) # 네이버 봇 차단을 피하기 위해 8초 대기
+                        driver = initialize_driver()
+                        start_page = load_progress().get("current_page", 1) # 저장해둔 다음 페이지 번호 불러오기
+                        continue # retry_count를 올리지 않고 안전하게 계속 진행
+                        
                 except Exception as e:
                     retry_count += 1
                     logging.error(f"⚠️ 오류 발생 (재시도 {retry_count}/{MAX_RETRY_ATTEMPTS}): {e}")
                     if retry_count < MAX_RETRY_ATTEMPTS:
                         try: driver.quit()
                         except Exception: pass
-                        time.sleep(5)
+                        time.sleep(10)
                         driver = initialize_driver()
                         start_page = load_progress().get("current_page", 1)
                     else: break

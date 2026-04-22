@@ -521,7 +521,7 @@ def main():
         driver = initialize_driver()
 
         # 💡 [추가] 오늘 처리한 검색어 개수를 세는 변수
-        procesed_count = 0
+        processed_count = 0
         
         for search_query in search_terms:
             if search_query in completed: 

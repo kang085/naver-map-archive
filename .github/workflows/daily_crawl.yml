@@ -26,7 +26,8 @@ jobs:
 
     - name: 📦 라이브러리 설치
       run: |
-        pip install pandas selenium webdriver-manager
+        # 💡 인터넷이 불안정할 때를 대비해 타임아웃 시간을 늘리고, 실패 시 최대 5번까지 자동 재시도하는 옵션을 추가합니다.
+        pip install --default-timeout=100 --retries 5 pandas selenium webdriver-manager
 
     - name: 🚀 크롤러 실행 (최대 2개 검색어)
       run: python naver_crawler_every_v6.py
